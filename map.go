@@ -2,7 +2,7 @@ package vfs
 
 import (
 	"path"
-	"time"
+	"sort"
 )
 
 // Map returns a MemoryFileSystem using the given files argument to
@@ -12,15 +12,35 @@ import (
 // making "a" both a file and a directory), an error will be returned.
 func Map(files map[string]*File) (*MemoryFileSystem, error) {
 	fs := Memory()
-	for k, v := range files {
-		if v.Mode == 0 {
-			v.Mode = 0644
+	keys := make([]string, 0, len(files))
+	for k := range files {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var dir *Dir
+	var prevDir *Dir
+	var prevDirPath string
+	for _, k := range keys {
+		file := files[k]
+		if file.Mode == 0 {
+			file.Mode = 0644
 		}
-		if v.ModTime.IsZero() {
-			v.ModTime = time.Now()
+		fileDir, fileBase := path.Split(k)
+		if prevDir != nil && fileDir == prevDirPath {
+			dir = prevDir
+		} else {
+			if err := MkdirAll(fs, fileDir, 0755); err != nil {
+				return nil, err
+			}
+			var err error
+			dir, err = fs.dirEntry(fileDir)
+			if err != nil {
+				return nil, err
+			}
+			prevDir = dir
+			prevDirPath = fileDir
 		}
-		fs.files[k] = v
-		if err := MkdirAll(fs, path.Dir(k), 0755); err != nil {
+		if err := dir.Add(fileBase, file); err != nil {
 			return nil, err
 		}
 	}
