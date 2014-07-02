@@ -3,22 +3,15 @@ package vfs
 import (
 	"bytes"
 	"compress/gzip"
-	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
-)
-
-var (
-	goTestFile      = filepath.Join("testdata", "go1.3.src.tar.gz")
-	errNoGoTestFile = fmt.Errorf("%s not found, use testdata/download-data.sh to fetch it", goTestFile)
 )
 
 func BenchmarkLoadGoSrc(b *testing.B) {
 	f, err := os.Open(goTestFile)
 	if err != nil {
-		b.Skip(errNoGoTestFile)
+		b.Skip(errNoTestFile(goTestFile))
 	}
 	defer f.Close()
 	// Decompress to avoid measuring the time to gunzip
@@ -42,7 +35,7 @@ func BenchmarkLoadGoSrc(b *testing.B) {
 func BenchmarkWalkGoSrc(b *testing.B) {
 	f, err := os.Open(goTestFile)
 	if err != nil {
-		b.Skip(errNoGoTestFile)
+		b.Skip(errNoTestFile(goTestFile))
 	}
 	defer f.Close()
 	fs, err := TarGzip(f)

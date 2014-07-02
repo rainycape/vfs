@@ -1,10 +1,22 @@
 package vfs
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
+
+var (
+	goTestFile = filepath.Join("testdata", "go1.3.src.tar.gz")
+)
+
+type errNoTestFile string
+
+func (e errNoTestFile) Error() string {
+	return fmt.Sprintf("%s test file not found, use testdata/download-data.sh to fetch it", filepath.Base(string(e)))
+}
 
 func testVFS(t *testing.T, fs VFS) {
 	if err := WriteFile(fs, "a", []byte("A"), 0644); err != nil {
@@ -155,4 +167,67 @@ func TestTmpFS(t *testing.T) {
 	}
 	defer fs.Close()
 	testVFS(t, fs)
+}
+
+const (
+	go13FileCount = 4157
+	// +1 because of the root, the real count is 407
+	go13DirCount = 407 + 1
+)
+
+func countFileSystem(fs VFS) (int, int, error) {
+	files, dirs := 0, 0
+	err := Walk(fs, "/", func(fs VFS, _ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			dirs++
+		} else {
+			files++
+		}
+		return nil
+	})
+	return files, dirs, err
+}
+
+func testGoFileCount(t *testing.T, fs VFS) {
+	files, dirs, err := countFileSystem(fs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if files != go13FileCount {
+		t.Errorf("expecting %d files in go1.3, got %d instead", go13FileCount, files)
+	}
+	if dirs != go13DirCount {
+		t.Errorf("expecting %d directories in go1.3, got %d instead", go13DirCount, dirs)
+	}
+}
+
+func TestGo13Files(t *testing.T) {
+	f, err := os.Open(goTestFile)
+	if err != nil {
+		t.Skip(errNoTestFile(goTestFile))
+	}
+	defer f.Close()
+	fs, err := TarGzip(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testGoFileCount(t, fs)
+}
+
+func TestMounter(t *testing.T) {
+	m := &Mounter{}
+	f, err := os.Open(goTestFile)
+	if err != nil {
+		t.Skip(errNoTestFile(goTestFile))
+	}
+	defer f.Close()
+	fs, err := TarGzip(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Mount(fs, "/")
+	testGoFileCount(t, m)
 }
