@@ -9,13 +9,13 @@ import (
 	"time"
 )
 
-type MemoryFileSystem struct {
+type memoryFileSystem struct {
 	mu   sync.RWMutex
 	root *Dir
 }
 
 // entry must always be called with the lock held
-func (fs *MemoryFileSystem) entry(path string) (Entry, *Dir, int, error) {
+func (fs *memoryFileSystem) entry(path string) (Entry, *Dir, int, error) {
 	path = cleanPath(path)
 	if path == "" || path == "/" || path == "." {
 		return fs.root, nil, 0, nil
@@ -50,7 +50,7 @@ func (fs *MemoryFileSystem) entry(path string) (Entry, *Dir, int, error) {
 	return nil, nil, 0, os.ErrNotExist
 }
 
-func (fs *MemoryFileSystem) dirEntry(path string) (*Dir, error) {
+func (fs *memoryFileSystem) dirEntry(path string) (*Dir, error) {
 	entry, _, _, err := fs.entry(path)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (fs *MemoryFileSystem) dirEntry(path string) (*Dir, error) {
 	return entry.(*Dir), nil
 }
 
-func (fs *MemoryFileSystem) Open(path string) (RFile, error) {
+func (fs *memoryFileSystem) Open(path string) (RFile, error) {
 	entry, _, _, err := fs.entry(path)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (fs *MemoryFileSystem) Open(path string) (RFile, error) {
 	return &file{f: entry.(*File), readable: true}, nil
 }
 
-func (fs *MemoryFileSystem) OpenFile(path string, flag int, mode os.FileMode) (WFile, error) {
+func (fs *memoryFileSystem) OpenFile(path string, flag int, mode os.FileMode) (WFile, error) {
 	if mode&os.ModeType != 0 {
 		return nil, fmt.Errorf("%T does not support special files", fs)
 	}
@@ -121,11 +121,11 @@ func (fs *MemoryFileSystem) OpenFile(path string, flag int, mode os.FileMode) (W
 	return &file{f: f.(*File), readable: (flag&os.O_RDWR != 0), writable: true}, nil
 }
 
-func (fs *MemoryFileSystem) Lstat(path string) (os.FileInfo, error) {
+func (fs *memoryFileSystem) Lstat(path string) (os.FileInfo, error) {
 	return fs.Stat(path)
 }
 
-func (fs *MemoryFileSystem) Stat(path string) (os.FileInfo, error) {
+func (fs *memoryFileSystem) Stat(path string) (os.FileInfo, error) {
 	entry, _, _, err := fs.entry(path)
 	if err != nil {
 		return nil, err
@@ -133,13 +133,13 @@ func (fs *MemoryFileSystem) Stat(path string) (os.FileInfo, error) {
 	return &EntryInfo{Path: path, Entry: entry}, nil
 }
 
-func (fs *MemoryFileSystem) ReadDir(path string) ([]os.FileInfo, error) {
+func (fs *memoryFileSystem) ReadDir(path string) ([]os.FileInfo, error) {
 	fs.mu.RLock()
 	defer fs.mu.RUnlock()
 	return fs.readDir(path)
 }
 
-func (fs *MemoryFileSystem) readDir(path string) ([]os.FileInfo, error) {
+func (fs *memoryFileSystem) readDir(path string) ([]os.FileInfo, error) {
 	entry, _, _, err := fs.entry(path)
 	if err != nil {
 		return nil, err
@@ -160,7 +160,7 @@ func (fs *MemoryFileSystem) readDir(path string) ([]os.FileInfo, error) {
 	return infos, nil
 }
 
-func (fs *MemoryFileSystem) Mkdir(path string, perm os.FileMode) error {
+func (fs *memoryFileSystem) Mkdir(path string, perm os.FileMode) error {
 	path = cleanPath(path)
 	dir, base := pathpkg.Split(path)
 	fs.mu.RLock()
@@ -181,7 +181,7 @@ func (fs *MemoryFileSystem) Mkdir(path string, perm os.FileMode) error {
 	return nil
 }
 
-func (fs *MemoryFileSystem) Remove(path string) error {
+func (fs *memoryFileSystem) Remove(path string) error {
 	entry, dir, pos, err := fs.entry(path)
 	if err != nil {
 		return err
@@ -200,13 +200,12 @@ func (fs *MemoryFileSystem) Remove(path string) error {
 	return err
 }
 
-func (fs *MemoryFileSystem) String() string {
+func (fs *memoryFileSystem) String() string {
 	return "MemoryFileSystem"
 }
 
-// Memory returns an empty MemoryFileSystem.
-func Memory() *MemoryFileSystem {
-	fs := &MemoryFileSystem{
+func newMemory() *memoryFileSystem {
+	fs := &memoryFileSystem{
 		root: &Dir{
 			Mode:    os.ModeDir | 0755,
 			ModTime: time.Now(),
@@ -215,10 +214,11 @@ func Memory() *MemoryFileSystem {
 	return fs
 }
 
-func cleanPath(path string) string {
-	return strings.Trim(pathpkg.Clean("/"+path), "/")
+// Memory returns an empty in memory VFS.
+func Memory() VFS {
+	return newMemory()
 }
 
-func memoryCompileTimeCheck() VFS {
-	return &MemoryFileSystem{}
+func cleanPath(path string) string {
+	return strings.Trim(pathpkg.Clean("/"+path), "/")
 }

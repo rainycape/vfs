@@ -66,3 +66,20 @@ type VFS interface {
 	// String returns a human-readable description of the VFS.
 	String() string
 }
+
+// TemporaryVFS represents a temporary file system which can be removed
+// by calling its Close method.
+type TemporaryVFS interface {
+	VFS
+	// Root returns the root directory for the temporary VFS.
+	Root() string
+	// Close removes all the files in temporary VFS.
+	Close() error
+}
+
+// Container is implemented by some file systems which
+// contain another one.
+type Container interface {
+	// VFS returns the underlying VFS.
+	VFS() VFS
+}

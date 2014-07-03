@@ -14,13 +14,13 @@ import (
 	"strings"
 )
 
-// Zip returns a MemoryFileSystem initialized with the
+// Zip returns an in-memory VFS initialized with the
 // contents of the .zip file read from the given io.Reader.
 // Since archive/zip requires an io.ReaderAt rather than an
 // io.Reader, and a known size, Zip will read the whole file
 // into memory and provide its own buffering if r does not
 // implement io.ReaderAt or size is <= 0.
-func Zip(r io.Reader, size int64) (*MemoryFileSystem, error) {
+func Zip(r io.Reader, size int64) (VFS, error) {
 	rat, _ := r.(io.ReaderAt)
 	if rat == nil || size <= 0 {
 		data, err := ioutil.ReadAll(r)
@@ -54,9 +54,9 @@ func Zip(r io.Reader, size int64) (*MemoryFileSystem, error) {
 	return Map(files)
 }
 
-// Tar returns a MemoryFileSystem initialized with the
+// Tar returns an in-memory VFS initialized with the
 // contents of the .tar file read from the given io.Reader.
-func Tar(r io.Reader) (*MemoryFileSystem, error) {
+func Tar(r io.Reader) (VFS, error) {
 	files := make(map[string]*File)
 	tr := tar.NewReader(r)
 	for {
@@ -83,9 +83,9 @@ func Tar(r io.Reader) (*MemoryFileSystem, error) {
 	return Map(files)
 }
 
-// TarGzip returns a MemoryFileSystem initialized with the
+// TarGzip returns an in-memory VFS initialized with the
 // contents of the .tar.gz file read from the given io.Reader.
-func TarGzip(r io.Reader) (*MemoryFileSystem, error) {
+func TarGzip(r io.Reader) (VFS, error) {
 	zr, err := gzip.NewReader(r)
 	if err != nil {
 		return nil, err
@@ -94,14 +94,14 @@ func TarGzip(r io.Reader) (*MemoryFileSystem, error) {
 	return Tar(zr)
 }
 
-// TarBzip2 returns a MemoryFileSystem initialized with the
+// TarBzip2 returns an in-memory VFS initialized with the
 // contents of then .tar.bz2 file read from the given io.Reader.
-func TarBzip2(r io.Reader) (*MemoryFileSystem, error) {
+func TarBzip2(r io.Reader) (VFS, error) {
 	bzr := bzip2.NewReader(r)
 	return Tar(bzr)
 }
 
-// Open returns a MemoryFileSystem initialized with the contents
+// Open returns an in-memory VFS initialized with the contents
 // of the given filename, which must have one of the following
 // extensions:
 //
@@ -109,7 +109,7 @@ func TarBzip2(r io.Reader) (*MemoryFileSystem, error) {
 //  - .tar
 //  - .tar.gz
 //  - .tar.bz2
-func Open(filename string) (*MemoryFileSystem, error) {
+func Open(filename string) (VFS, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
