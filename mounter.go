@@ -32,7 +32,7 @@ func (m *mountPoint) String() string {
 	return fmt.Sprintf("%s at %s", m.fs, m.point)
 }
 
-// Mounter implements he VFS interface and allows mounting different virtual
+// Mounter implements the VFS interface and allows mounting different virtual
 // file systems at arbitraty points, working much like a UNIX filesystem.
 // Note that the first mounted filesystem must be always at "/".
 type Mounter struct {
