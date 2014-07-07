@@ -7,24 +7,33 @@ import (
 	"time"
 )
 
+// EntryType indicates the type of the entry.
 type EntryType uint8
 
 const (
+	// EntryTypeFile indicates the entry is a file.
 	EntryTypeFile EntryType = iota + 1
+	// EntryTypeDir indicates the entry is a directory.
 	EntryTypeDir
 )
 
+// Entry is the interface implemented by the in-memory representations
+// of files and directories.
 type Entry interface {
+	// Type returns the entry type, either EntryTypeFile or
+	// EntryTypeDir.
 	Type() EntryType
+	// Size returns the file size. For directories, it's always zero.
 	Size() int64
+	// FileMode returns the file mode as an os.FileMode.
 	FileMode() os.FileMode
+	// ModificationTime returns the last time the file or the directory
+	// was modified.
 	ModificationTime() time.Time
 }
 
-// Type File represents an in-memory file or
-// directory. Most in-memory VFS should use this
-// structure to represent their files, in order to
-// save work.
+// Type File represents an in-memory file. Most in-memory VFS implementations
+// should use this structure to represent their files, in order to save work.
 type File struct {
 	sync.RWMutex
 	// Data contains the file data.
@@ -56,6 +65,9 @@ func (f *File) ModificationTime() time.Time {
 	return f.ModTime
 }
 
+// Type DIr represents an in-memory directory. Most in-memory VFS
+// implementations should use this structure to represent their
+// directories, in order to save work.
 type Dir struct {
 	sync.RWMutex
 	// Mode is the file or directory mode. Note that some filesystems
@@ -87,6 +99,8 @@ func (d *Dir) ModificationTime() time.Time {
 	return d.ModTime
 }
 
+// Add ads a new entry to the directory. If there's already an
+// entry ith the same name, an error is returned.
 func (d *Dir) Add(name string, entry Entry) error {
 	// TODO: Binary search
 	for ii, v := range d.EntryNames {
@@ -115,6 +129,9 @@ func (d *Dir) Add(name string, entry Entry) error {
 	return nil
 }
 
+// Find returns the entry with the given name and its index,
+// or an error if an entry with that name does not exist in
+// the directory.
 func (d *Dir) Find(name string) (Entry, int, error) {
 	for ii, v := range d.EntryNames {
 		if v == name {
@@ -160,7 +177,7 @@ func (info *EntryInfo) Sys() interface{} {
 }
 
 // FileInfos represents an slice of os.FileInfo which
-// implements the sort.Sort protocol. This type is only
+// implements the sort.Interface. This type is only
 // exported for users who want to implement their own
 // filesystems, since VFS.ReadDir requires the returned
 // []os.FileInfo to be sorted by name.
