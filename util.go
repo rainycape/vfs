@@ -8,6 +8,7 @@ import (
 	"os"
 	pathpkg "path"
 	"strings"
+	"time"
 )
 
 var (
@@ -75,6 +76,7 @@ func (f *file) Write(p []byte) (int, error) {
 		f.f.Data = append(f.f.Data, p[n:]...)
 	}
 	f.offset += count
+	f.f.ModTime = time.Now()
 	return count, nil
 }
 
