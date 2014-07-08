@@ -8,6 +8,12 @@ import (
 	"path/filepath"
 )
 
+// IMPORTANT: Note about wrapping os. functions: os.Open, os.OpenFile etc... will return a non-nil
+// interface pointing to a nil instance in case of error (whoever decided this disctintion in Go
+// was a good idea deservers to be hung by his thumbs). This is highly undesirable, since users
+// can't rely on checking f != nil to know if a correct handle was returned. That's why the
+// methods in fileSystem do the error checking themselves and return a true nil in case of error.
+
 type fileSystem struct {
 	root      string
 	temporary bool
@@ -30,23 +36,43 @@ func (fs *fileSystem) IsTemporary() bool {
 }
 
 func (fs *fileSystem) Open(path string) (RFile, error) {
-	return os.Open(fs.path(path))
+	f, err := os.Open(fs.path(path))
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
 func (fs *fileSystem) OpenFile(path string, flag int, mode os.FileMode) (WFile, error) {
-	return os.OpenFile(fs.path(path), flag, mode)
+	f, err := os.OpenFile(fs.path(path), flag, mode)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
 func (fs *fileSystem) Lstat(path string) (os.FileInfo, error) {
-	return os.Lstat(fs.path(path))
+	info, err := os.Lstat(fs.path(path))
+	if err != nil {
+		return nil, err
+	}
+	return info, nil
 }
 
 func (fs *fileSystem) Stat(path string) (os.FileInfo, error) {
-	return os.Stat(fs.path(path))
+	info, err := os.Stat(fs.path(path))
+	if err != nil {
+		return nil, err
+	}
+	return info, nil
 }
 
 func (fs *fileSystem) ReadDir(path string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(fs.path(path))
+	files, err := ioutil.ReadDir(fs.path(path))
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
 }
 
 func (fs *fileSystem) Mkdir(path string, perm os.FileMode) error {
