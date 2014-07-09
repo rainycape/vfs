@@ -7,7 +7,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"vfs"
+
+	"github.com/rainycape/vfs"
 )
 
 const (
