@@ -36,6 +36,9 @@ func Zip(r io.Reader, size int64) (VFS, error) {
 	}
 	files := make(map[string]*File)
 	for _, file := range zr.File {
+		if file.Mode().IsDir() {
+			continue
+		}
 		f, err := file.Open()
 		if err != nil {
 			return nil, err
