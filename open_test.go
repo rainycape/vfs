@@ -5,12 +5,7 @@ import (
 	"testing"
 )
 
-func testOpenFilename(t *testing.T, filename string) {
-	p := filepath.Join("testdata", filename)
-	fs, err := Open(p)
-	if err != nil {
-		t.Fatal(err)
-	}
+func testOpenedVFS(t *testing.T, fs VFS) {
 	data1, err := ReadFile(fs, "a/b/c/d")
 	if err != nil {
 		t.Fatal(err)
@@ -25,6 +20,15 @@ func testOpenFilename(t *testing.T, filename string) {
 	if len(data2) > 0 {
 		t.Error("non-empty empty file")
 	}
+}
+
+func testOpenFilename(t *testing.T, filename string) {
+	p := filepath.Join("testdata", filename)
+	fs, err := Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testOpenedVFS(t, fs)
 }
 
 func TestOpenZip(t *testing.T) {
