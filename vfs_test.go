@@ -231,3 +231,36 @@ func TestMounter(t *testing.T) {
 	m.Mount(fs, "/")
 	testGoFileCount(t, m)
 }
+
+func TestClone(t *testing.T) {
+	fs, err := Open(filepath.Join("testdata", "fs.zip"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	infos1, err := fs.ReadDir("/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mem1 := Memory()
+	if err := Clone(mem1, fs); err != nil {
+		t.Fatal(err)
+	}
+	infos2, err := mem1.ReadDir("/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos2) != len(infos1) {
+		t.Fatalf("cloned fs has %d entries in / rather than %d", len(infos2), len(infos1))
+	}
+	mem2 := Memory()
+	if err := Clone(mem2, mem1); err != nil {
+		t.Fatal(err)
+	}
+	infos3, err := mem2.ReadDir("/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos3) != len(infos2) {
+		t.Fatalf("cloned fs has %d entries in / rather than %d", len(infos3), len(infos2))
+	}
+}

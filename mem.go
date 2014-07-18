@@ -1,12 +1,18 @@
 package vfs
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	pathpkg "path"
 	"strings"
 	"sync"
 	"time"
+)
+
+var (
+	errNoEmptyNameFile = errors.New("can't create file with empty name")
+	errNoEmptyNameDir  = errors.New("can't create directory with empty name")
 )
 
 type memoryFileSystem struct {
@@ -78,6 +84,9 @@ func (fs *memoryFileSystem) OpenFile(path string, flag int, mode os.FileMode) (W
 	}
 	path = cleanPath(path)
 	dir, base := pathpkg.Split(path)
+	if base == "" {
+		return nil, errNoEmptyNameFile
+	}
 	fs.mu.RLock()
 	d, err := fs.dirEntry(dir)
 	fs.mu.RUnlock()
@@ -163,6 +172,12 @@ func (fs *memoryFileSystem) readDir(path string) ([]os.FileInfo, error) {
 func (fs *memoryFileSystem) Mkdir(path string, perm os.FileMode) error {
 	path = cleanPath(path)
 	dir, base := pathpkg.Split(path)
+	if base == "" {
+		if dir == "/" || dir == "" {
+			return os.ErrExist
+		}
+		return errNoEmptyNameDir
+	}
 	fs.mu.RLock()
 	d, err := fs.dirEntry(dir)
 	fs.mu.RUnlock()
