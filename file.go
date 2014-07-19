@@ -65,7 +65,7 @@ func (f *File) ModificationTime() time.Time {
 	return f.ModTime
 }
 
-// Type DIr represents an in-memory directory. Most in-memory VFS
+// Type Dir represents an in-memory directory. Most in-memory VFS
 // implementations should use this structure to represent their
 // directories, in order to save work.
 type Dir struct {
