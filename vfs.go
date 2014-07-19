@@ -67,7 +67,7 @@ type VFS interface {
 	String() string
 }
 
-// TemporaryVFS represents a temporary file system which can be removed
+// TemporaryVFS represents a temporary on-disk file system which can be removed
 // by calling its Close method.
 type TemporaryVFS interface {
 	VFS
