@@ -195,3 +195,33 @@ func IsExist(err error) bool {
 func IsNotExist(err error) bool {
 	return os.IsNotExist(err)
 }
+
+// Compressor is the interface implemented by VFS files which can be
+// transparently compressed and decompressed. Currently, this is only
+// supported by the in-memory filesystems.
+type Compressor interface {
+	IsCompressed() bool
+	SetCompressed(c bool)
+}
+
+// Compress is a shorthand method for compressing all the files in a VFS.
+// Note that not all file systems support transparent compression/decompression.
+func Compress(fs VFS) error {
+	return Walk(fs, "/", func(fs VFS, p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		mode := info.Mode()
+		if mode.IsDir() || mode&ModeCompress != 0 {
+			return nil
+		}
+		f, err := fs.Open(p)
+		if err != nil {
+			return err
+		}
+		if c, ok := f.(Compressor); ok {
+			c.SetCompressed(true)
+		}
+		return f.Close()
+	})
+}

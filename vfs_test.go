@@ -1,7 +1,10 @@
 package vfs
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -265,5 +268,69 @@ func TestClone(t *testing.T) {
 	}
 	if len(infos3) != len(infos2) {
 		t.Fatalf("cloned fs has %d entries in / rather than %d", len(infos3), len(infos2))
+	}
+}
+
+func measureVFSMemorySize(t testing.TB, fs VFS) int {
+	mem, ok := fs.(*memoryFileSystem)
+	if !ok {
+		t.Fatalf("%T is not a memory filesystem", fs)
+	}
+	var total int
+	var f func(d *Dir)
+	f = func(d *Dir) {
+		for _, v := range d.Entries {
+			total += int(v.Size())
+			if sd, ok := v.(*Dir); ok {
+				f(sd)
+			}
+		}
+	}
+	f(mem.root)
+	return total
+}
+
+func hashVFS(t testing.TB, fs VFS) string {
+	sha := sha1.New()
+	err := Walk(fs, "/", func(fs VFS, p string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		f, err := fs.Open(p)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		if _, err := io.Copy(sha, f); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return hex.EncodeToString(sha.Sum(nil))
+}
+
+func TestCompress(t *testing.T) {
+	f := openOptionalTestFile(t, goTestFile)
+	defer f.Close()
+	fs, err := TarGzip(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	size1 := measureVFSMemorySize(t, fs)
+	hash1 := hashVFS(t, fs)
+	if err := Compress(fs); err != nil {
+		t.Fatalf("can't compress fs: %s", err)
+	}
+	testGoFileCount(t, fs)
+	size2 := measureVFSMemorySize(t, fs)
+	hash2 := hashVFS(t, fs)
+	if size2 >= size1 {
+		t.Fatalf("compressed fs takes more memory %d than bare fs %d", size2, size1)
+	}
+	if hash1 != hash2 {
+		t.Fatalf("compressing fs changed hash from %s to %s", hash1, hash2)
 	}
 }

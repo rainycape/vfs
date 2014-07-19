@@ -17,6 +17,10 @@ const (
 	EntryTypeDir
 )
 
+const (
+	ModeCompress os.FileMode = 1 << 16
+)
+
 // Entry is the interface implemented by the in-memory representations
 // of files and directories.
 type Entry interface {

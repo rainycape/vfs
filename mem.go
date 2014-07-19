@@ -75,7 +75,7 @@ func (fs *memoryFileSystem) Open(path string) (RFile, error) {
 	if entry.Type() != EntryTypeFile {
 		return nil, fmt.Errorf("%s is not a file", path)
 	}
-	return NewRFile(entry.(*File)), nil
+	return NewRFile(entry.(*File))
 }
 
 func (fs *memoryFileSystem) OpenFile(path string, flag int, mode os.FileMode) (WFile, error) {
@@ -105,7 +105,7 @@ func (fs *memoryFileSystem) OpenFile(path string, flag int, mode os.FileMode) (W
 		if f == nil {
 			return nil, os.ErrNotExist
 		}
-		return NewWFile(f.(*File), true, false), nil
+		return NewWFile(f.(*File), true, false)
 	}
 	// Write file, either f != nil or flag&os.O_CREATE
 	if f != nil {
@@ -127,7 +127,7 @@ func (fs *memoryFileSystem) OpenFile(path string, flag int, mode os.FileMode) (W
 		f = &File{ModTime: time.Now()}
 		d.Add(base, f)
 	}
-	return NewWFile(f.(*File), flag&os.O_RDWR != 0, true), nil
+	return NewWFile(f.(*File), flag&os.O_RDWR != 0, true)
 }
 
 func (fs *memoryFileSystem) Lstat(path string) (os.FileInfo, error) {
