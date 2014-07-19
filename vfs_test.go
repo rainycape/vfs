@@ -8,14 +8,23 @@ import (
 	"testing"
 )
 
-var (
-	goTestFile = filepath.Join("testdata", "go1.3.src.tar.gz")
+const (
+	goTestFile = "go1.3.src.tar.gz"
 )
 
 type errNoTestFile string
 
 func (e errNoTestFile) Error() string {
 	return fmt.Sprintf("%s test file not found, use testdata/download-data.sh to fetch it", filepath.Base(string(e)))
+}
+
+func openOptionalTestFile(t testing.TB, name string) *os.File {
+	filename := filepath.Join("testdata", name)
+	f, err := os.Open(filename)
+	if err != nil {
+		t.Skip(errNoTestFile(filename))
+	}
+	return f
 }
 
 func testVFS(t *testing.T, fs VFS) {
@@ -205,10 +214,7 @@ func testGoFileCount(t *testing.T, fs VFS) {
 }
 
 func TestGo13Files(t *testing.T) {
-	f, err := os.Open(goTestFile)
-	if err != nil {
-		t.Skip(errNoTestFile(goTestFile))
-	}
+	f := openOptionalTestFile(t, goTestFile)
 	defer f.Close()
 	fs, err := TarGzip(f)
 	if err != nil {
@@ -219,10 +225,7 @@ func TestGo13Files(t *testing.T) {
 
 func TestMounter(t *testing.T) {
 	m := &Mounter{}
-	f, err := os.Open(goTestFile)
-	if err != nil {
-		t.Skip(errNoTestFile(goTestFile))
-	}
+	f := openOptionalTestFile(t, goTestFile)
 	defer f.Close()
 	fs, err := TarGzip(f)
 	if err != nil {

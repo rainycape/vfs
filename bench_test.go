@@ -9,10 +9,7 @@ import (
 )
 
 func BenchmarkLoadGoSrc(b *testing.B) {
-	f, err := os.Open(goTestFile)
-	if err != nil {
-		b.Skip(errNoTestFile(goTestFile))
-	}
+	f := openOptionalTestFile(b, goTestFile)
 	defer f.Close()
 	// Decompress to avoid measuring the time to gunzip
 	zr, err := gzip.NewReader(f)
@@ -33,10 +30,7 @@ func BenchmarkLoadGoSrc(b *testing.B) {
 }
 
 func BenchmarkWalkGoSrc(b *testing.B) {
-	f, err := os.Open(goTestFile)
-	if err != nil {
-		b.Skip(errNoTestFile(goTestFile))
-	}
+	f := openOptionalTestFile(b, goTestFile)
 	defer f.Close()
 	fs, err := TarGzip(f)
 	if err != nil {
