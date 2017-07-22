@@ -33,7 +33,7 @@ func Map(files map[string]*File) (VFS, error) {
 				return nil, err
 			}
 			var err error
-			dir, err = fs.dirEntry(fileDir)
+			dir, err = fs.dirEntry(fileDir, true)
 			if err != nil {
 				return nil, err
 			}

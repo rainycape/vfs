@@ -2,12 +2,15 @@ package vfs
 
 import (
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -333,4 +336,65 @@ func TestCompress(t *testing.T) {
 	if hash1 != hash2 {
 		t.Fatalf("compressing fs changed hash from %s to %s", hash1, hash2)
 	}
+}
+
+func testHashes(t *testing.T, fs VFS, hashes map[string]string) {
+	for k, v := range hashes {
+		f, err := fs.Open(k)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := ioutil.ReadAll(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
+		p := strings.Split(v, ":")
+		var h []byte
+		switch p[0] {
+		case "sha1":
+			sha1h := sha1.Sum(data)
+			h = sha1h[:]
+		case "sha256":
+			sha256h := sha256.Sum256(data)
+			h = sha256h[:]
+		default:
+			t.Fatalf("unknown hash algorithm %q", p[0])
+		}
+		s := hex.EncodeToString(h[:])
+		if s != p[1] {
+			t.Errorf("expected %s(%s) = %q, got %q instead", p[0], k, v, p[1])
+		}
+	}
+}
+
+func TestZipSymlinks(t *testing.T) {
+	fs, err := Open(filepath.Join("testdata", "fs2.zip"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var hashes = map[string]string{
+		"f1.bin": "sha1:b98c6a155dc7a778874dfc6023be2bacc2e495dd",
+		"f2.bin": "sha1:989c1dda053300c5d2c101240acb2e6678f0319a",
+		"f3.bin": "sha1:989c1dda053300c5d2c101240acb2e6678f0319a",
+	}
+	testHashes(t, fs, hashes)
+	// Make sure f3.bin is a symlink
+	st1, err := fs.Lstat("f2.bin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st1.Mode()&os.ModeSymlink != 0 {
+		t.Error("f2.bin is a symlink, it shouldn't be")
+	}
+	st2, err := fs.Lstat("f3.bin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st2.Mode()&os.ModeSymlink == 0 {
+		t.Error("f3.bin isn't a symlink, it should be")
+	}
+
 }

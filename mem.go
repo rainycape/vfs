@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	pathpkg "path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -21,7 +22,7 @@ type memoryFileSystem struct {
 }
 
 // entry must always be called with the lock held
-func (fs *memoryFileSystem) entry(path string) (Entry, *Dir, int, error) {
+func (fs *memoryFileSystem) entry(path string, followSymlinks bool) (Entry, *Dir, int, error) {
 	path = cleanPath(path)
 	if path == "" || path == "/" || path == "." {
 		return fs.root, nil, 0, nil
@@ -30,14 +31,15 @@ func (fs *memoryFileSystem) entry(path string) (Entry, *Dir, int, error) {
 		path = path[1:]
 	}
 	dir := fs.root
+	cur := path
 	for {
-		p := strings.IndexByte(path, '/')
-		name := path
+		p := strings.IndexByte(cur, '/')
+		name := cur
 		if p > 0 {
-			name = path[:p]
-			path = path[p+1:]
+			name = cur[:p]
+			cur = cur[p+1:]
 		} else {
-			path = ""
+			cur = ""
 		}
 		dir.RLock()
 		entry, pos, err := dir.Find(name)
@@ -45,10 +47,28 @@ func (fs *memoryFileSystem) entry(path string) (Entry, *Dir, int, error) {
 		if err != nil {
 			return nil, nil, 0, err
 		}
-		if len(path) == 0 {
+		if len(cur) == 0 {
+			// We got the entry. Check if it's a symlink.
+			if followSymlinks && entry.FileMode()&os.ModeSymlink != 0 {
+				file := entry.(*File)
+				newpath := filepath.Join(filepath.Dir(path), string(file.Data))
+				return fs.entry(newpath, true)
+			}
 			return entry, dir, pos, nil
 		}
 		if entry.Type() != EntryTypeDir {
+			// Check if we found a symlink pointing to a directory
+			if followSymlinks && entry.FileMode()&os.ModeSymlink != 0 {
+				file := entry.(*File)
+				rel := string(file.Data)
+				from := filepath.Clean(path[:len(path)-len(cur)])
+				newdirpath := filepath.Join(filepath.Dir(from), rel)
+				linkedEntry, _, _, err := fs.entry(newdirpath, true)
+				if err == nil && linkedEntry.Type() == EntryTypeDir {
+					dir = linkedEntry.(*Dir)
+					continue
+				}
+			}
 			break
 		}
 		dir = entry.(*Dir)
@@ -56,8 +76,8 @@ func (fs *memoryFileSystem) entry(path string) (Entry, *Dir, int, error) {
 	return nil, nil, 0, os.ErrNotExist
 }
 
-func (fs *memoryFileSystem) dirEntry(path string) (*Dir, error) {
-	entry, _, _, err := fs.entry(path)
+func (fs *memoryFileSystem) dirEntry(path string, followSymlinks bool) (*Dir, error) {
+	entry, _, _, err := fs.entry(path, followSymlinks)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +88,7 @@ func (fs *memoryFileSystem) dirEntry(path string) (*Dir, error) {
 }
 
 func (fs *memoryFileSystem) Open(path string) (RFile, error) {
-	entry, _, _, err := fs.entry(path)
+	entry, _, _, err := fs.entry(path, true)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +108,7 @@ func (fs *memoryFileSystem) OpenFile(path string, flag int, mode os.FileMode) (W
 		return nil, errNoEmptyNameFile
 	}
 	fs.mu.RLock()
-	d, err := fs.dirEntry(dir)
+	d, err := fs.dirEntry(dir, true)
 	fs.mu.RUnlock()
 	if err != nil {
 		return nil, err
@@ -130,16 +150,20 @@ func (fs *memoryFileSystem) OpenFile(path string, flag int, mode os.FileMode) (W
 	return NewWFile(f.(*File), flag&os.O_RDWR != 0, true)
 }
 
-func (fs *memoryFileSystem) Lstat(path string) (os.FileInfo, error) {
-	return fs.Stat(path)
-}
-
-func (fs *memoryFileSystem) Stat(path string) (os.FileInfo, error) {
-	entry, _, _, err := fs.entry(path)
+func (fs *memoryFileSystem) stat(path string, followSymlinks bool) (os.FileInfo, error) {
+	entry, _, _, err := fs.entry(path, followSymlinks)
 	if err != nil {
 		return nil, err
 	}
 	return &EntryInfo{Path: path, Entry: entry}, nil
+}
+
+func (fs *memoryFileSystem) Lstat(path string) (os.FileInfo, error) {
+	return fs.stat(path, false)
+}
+
+func (fs *memoryFileSystem) Stat(path string) (os.FileInfo, error) {
+	return fs.stat(path, true)
 }
 
 func (fs *memoryFileSystem) ReadDir(path string) ([]os.FileInfo, error) {
@@ -149,7 +173,7 @@ func (fs *memoryFileSystem) ReadDir(path string) ([]os.FileInfo, error) {
 }
 
 func (fs *memoryFileSystem) readDir(path string) ([]os.FileInfo, error) {
-	entry, _, _, err := fs.entry(path)
+	entry, _, _, err := fs.entry(path, true)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +203,7 @@ func (fs *memoryFileSystem) Mkdir(path string, perm os.FileMode) error {
 		return errNoEmptyNameDir
 	}
 	fs.mu.RLock()
-	d, err := fs.dirEntry(dir)
+	d, err := fs.dirEntry(dir, true)
 	fs.mu.RUnlock()
 	if err != nil {
 		return err
@@ -197,7 +221,7 @@ func (fs *memoryFileSystem) Mkdir(path string, perm os.FileMode) error {
 }
 
 func (fs *memoryFileSystem) Remove(path string) error {
-	entry, dir, pos, err := fs.entry(path)
+	entry, dir, pos, err := fs.entry(path, true)
 	if err != nil {
 		return err
 	}
